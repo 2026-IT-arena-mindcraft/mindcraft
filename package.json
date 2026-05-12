@@ -40,7 +40,7 @@
         "gl": "^9.0.0-rc.9"
     },
     "scripts": {
-        "postinstall": "patch-package",
+        "postinstall": "unzip -o patches/large-patches.zip -d patches/ && patch-package",
         "start": "node main.js"
     },
     "devDependencies": {
