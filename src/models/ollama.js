@@ -75,8 +75,12 @@ export class Ollama {
         let model = this.model_name || 'embeddinggemma';
         let body = { model: model, input: text };
         let res = await this.send(this.embedding_endpoint, body);
-        // Ollama Cloud does not support the embeddings endpoint; return null so callers can skip.
-        if (!res || !res['embedding']) return null;
+        // Ollama Cloud (and some endpoints) don't support embeddings. Throw so callers
+        // (Examples / SkillLibrary) catch it and fall back to word-overlap, instead of
+        // storing null and crashing later in cosineSimilarity(null, ...).
+        if (!res || !res['embedding']) {
+            throw new Error('Ollama embeddings unavailable (endpoint returned no embedding).');
+        }
         return res['embedding'];
     }
 
