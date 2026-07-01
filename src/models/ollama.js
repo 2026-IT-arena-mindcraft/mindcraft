@@ -1,4 +1,5 @@
 import { strictFormat } from '../utils/text.js';
+import { hasKey, getKey } from '../utils/keys.js';
 
 export class Ollama {
     static prefix = 'ollama';
@@ -57,6 +58,8 @@ export class Ollama {
             if (hasOpenTag && hasCloseTag) {
                 res = res.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
             }
+            // Strip model-internal tokens like <|message|><|start|>assistant<|channel|>analysis<|message|>
+            res = res.replace(/<\|[^|]*\|>/g, '').trim();
             finalRes = res;
             break;
         }
@@ -72,6 +75,12 @@ export class Ollama {
         let model = this.model_name || 'embeddinggemma';
         let body = { model: model, input: text };
         let res = await this.send(this.embedding_endpoint, body);
+        // Ollama Cloud (and some endpoints) don't support embeddings. Throw so callers
+        // (Examples / SkillLibrary) catch it and fall back to word-overlap, instead of
+        // storing null and crashing later in cosineSimilarity(null, ...).
+        if (!res || !res['embedding']) {
+            throw new Error('Ollama embeddings unavailable (endpoint returned no embedding).');
+        }
         return res['embedding'];
     }
 
@@ -79,6 +88,11 @@ export class Ollama {
         const url = new URL(endpoint, this.url);
         let method = 'POST';
         let headers = new Headers();
+        // Authenticate against Ollama Cloud (or any auth-gated endpoint) when OLLAMA_API_KEY is set.
+        const apiKey = hasKey('OLLAMA_API_KEY') ? getKey('OLLAMA_API_KEY') : null;
+        if (apiKey) {
+            headers.set('Authorization', `Bearer ${apiKey}`);
+        }
         const request = new Request(url, { method, headers, body: JSON.stringify(body) });
         let data = null;
         try {
